@@ -118,7 +118,7 @@ def signup(bot, update):
     user = update.message.from_user
     try:
         addUser(fullname=user.first_name+' '+user.last_name, username=user.username, telegram_id=user.id, chat_id=update.message.chat_id)
-        bot.sendMessage(chat_id=update.message.chat_id, text="Salaam, Mamnoon az sabte nam. سلام")
+        bot.sendMessage(chat_id=update.message.chat_id, text="Salaam, Mamnoon az sabte nam.")
         bot.sendChatAction(chat_id=update.message.chat_id, action=ChatAction.UPLOAD_DOCUMENT) 
         bot.sendDocument(chat_id=update.message.chat_id, document=open('temp.txt','rb'), caption=user.first_name+'az radife ?? shoru konid')
         print("User added")
