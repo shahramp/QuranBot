@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 ########################################################################################
 #In the name of Allah
 # This bot is made for serving those who want to read Quran
@@ -55,19 +56,22 @@ def getAllUsers():
 def addUser(fullname, username, telegram_id, chat_id):
     max_user = 355
     users = getAllUsers()
-    # users = session.query(User).join(User.group).options(contains_eager(User.group)).all()
     
     for user in users:
         if not user.group.is_full:
             print("getAllUser")
             empty_group = None
         if user.telegram_id == telegram_id:
-            raise Exception('You are already signed in')
+            raise Exception('You are already signed in')    #Does not work
     new_user = User(fullname=fullname, username=username, telegram_id=telegram_id, chat_id=chat_id)
 
-    group = None
-    # TODO
-    # query the last group fromm the database -> group = session.query(Group).last()
+    
+    #group = None
+    db_group = session.query(Group).all() # query the last group fromm the database -> group = session.query(Group).last()
+    if db_group == []:
+        group = None
+    else:
+        group = db_group[-1]
     # if it's full/empty(no group) create a new group
     if group is None or group.is_full:
         print("Group None")
@@ -116,18 +120,25 @@ def groupFullNotif(Group):
 def signup(bot, update):
     bot.sendChatAction(chat_id=update.message.chat_id, action=ChatAction.TYPING)
     user = update.message.from_user
-    try:
-        addUser(fullname=user.first_name+' '+user.last_name, username=user.username, telegram_id=user.id, chat_id=update.message.chat_id)
-        bot.sendMessage(chat_id=update.message.chat_id, text="Salaam, Mamnoon az sabte nam.")
-        bot.sendChatAction(chat_id=update.message.chat_id, action=ChatAction.UPLOAD_DOCUMENT) 
-        bot.sendDocument(chat_id=update.message.chat_id, document=open('temp.txt','rb'), caption=user.first_name+'az radife ?? shoru konid')
-        print("User added")
-    except Exception as e:
-        bot.sendMessage(chat_id=update.message.chat_id, text=str(e))
-        print ("User adding failed:", str(e) )
+    db_user = session.query(User).filter(User.telegram_id == user.id)
+    if db_user.all()==[]:
+        try:
+            addUser(fullname=user.first_name+' '+user.last_name, username=user.username, telegram_id=user.id, chat_id=update.message.chat_id)
+            bot.sendMessage(chat_id=update.message.chat_id, text="سلام با تشکر از ثبت نام.")
+            db_user = session.query(User).filter(User.telegram_id == user.id)
+            in_group_index = db_user.one().in_group_index
+            bot.sendChatAction(chat_id=update.message.chat_id, action=ChatAction.UPLOAD_DOCUMENT) 
+            bot.sendDocument(chat_id=update.message.chat_id, document=open('Booklet.pdf','rb'), caption=user.first_name+' lotfan az radife {} shoru konid'.format(in_group_index))
+            print("User added")
+        except Exception as e:
+            bot.sendMessage(chat_id=update.message.chat_id, text=str(e))
+            print ("User adding failed:", str(e) )
+    else:
+        bot.sendMessage(chat_id=update.message.chat_id, text="شما قبلا ثبت نام کرده اید. برای اطلاعات بیشتر از دستور schedule/ استفاده کنید. ")
 
 def signout(bot, update):
     #TODO
+    bot.sendChatAction(chat_id=update.message.chat_id, action=ChatAction.TYPING)
     bot.sendMessage(chat_id=update.message.chat_id, text="Salaam, Mamnoon az sabte nam. Khodahafez")
 
 def getall(bot, update, password_entered):
@@ -160,22 +171,24 @@ def start(bot, update, password_entered):
         bot.sendMessage(chat_id=update.message.chat_id, text="Something went wrong!")
 
 def schedule(bot, update):
+    bot.sendChatAction(chat_id=update.message.chat_id, action=ChatAction.TYPING)
     telegram_user = update.message.from_user
-    db_user = session.query(User).filter(User.telegram_id == telegram_user.id)
-    # TODO: check if the user is in database, if not register him
-    # if so -> two options: 1- register the user 2- send a message that he should register first
-
-    if db_user.group.has_started != True:
-        bot.sendMessage(chat_id=update.message.chat_id, text="goroohe shoma hanuz shoroo nashode ast.")
-    else:    
-        in_group_index = db_user.in_group_index
-        
-        bot.sendMessage(chat_id=update.message.chat_id, text="Lotfan kami sabr konid.")
-        bot.sendChatAction(chat_id=update.message.chat_id, action=ChatAction.UPLOAD_DOCUMENT) 
-        bot.sendDocument(chat_id=update.message.chat_id, document=open('temp.txt','rb'), caption=user.first_name+'az radife {} shoru konid'.format(in_group_index))
-        # days = current_date - db_user.group.start_date
-        # shomare_radife_emruz = in_group_index+days
-        # send message 
+    db_user = session.query(User).join(User.group).options(contains_eager(User.group)).filter(User.telegram_id == telegram_user.id)
+    if db_user.all()==[]:
+        bot.sendMessage(chat_id=update.message.chat_id, text="شما در برنامه قرآن خوانی ثبت نام نکرده اید! اگر تمایل دارید ثبت نام کنید از دستور signup/ استفاده کنید.")
+    else:
+        in_group_index = db_user.one().in_group_index 
+        if db_user.one().group.has_started != True:
+            bot.sendMessage(chat_id=update.message.chat_id, text="گروه شما هنوز شروع نشده است")
+            bot.sendMessage(chat_id=update.message.chat_id, text=telegram_user.first_name+" در روز شروع گروه، شما باید از ردیف {} شروع کنید.".format(in_group_index))
+        else:    
+            in_group_index = db_user.in_group_index   
+            #bot.sendMessage(chat_id=update.message.chat_id, text="Lotfan kami sabr konid.")
+            bot.sendChatAction(chat_id=update.message.chat_id, action=ChatAction.UPLOAD_DOCUMENT) 
+            bot.sendDocument(chat_id=update.message.chat_id, document=open('temp.txt','rb'), caption=user.first_name+'az radife {} shoru konid'.format(in_group_index))
+            delta_t = datetime.datetime.now() - db_user.group.start_date
+            currentNum = in_group_index + delta_t.days
+            bot.sendMessage(chat_id=update.message.chat_id, text=telegram_user.first_name+" امروز باید ردیف {} را بخوانید.".format(in_group_index))
 
 def emruz(bot, update):
     pass
