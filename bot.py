@@ -103,7 +103,7 @@ logging.basicConfig(level=logging.DEBUG,
 logger = logging.getLogger(__name__)
 #########################################################################################
 ############# Functions ################
-def doStart(bot, group_id=0)
+def doStart(bot, group_id=0):
     db_group = session.query(Group).filter(Group.id=group_id)
     users = group.all_users
     
@@ -114,6 +114,8 @@ def doStart(bot, group_id=0)
     group.has_started = True
     group.start_date = datetime.datetime.now()
     session.commit()  
+    
+    
 def groupFullNotif(Group):
     #TODO
     #notify author if a group is full or automatically dostart
