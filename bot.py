@@ -56,15 +56,13 @@ def getAllUsers():
 def addUser(fullname, username, telegram_id, chat_id):
     max_user = 355
     users = getAllUsers()
-    s=[]
+    
     for user in users:
-        s.append(user.telegram_id)
         if not user.group.is_full:
             print("getAllUser")
             empty_group = None
         if user.telegram_id == telegram_id:
             raise Exception('You are already signed in')    #Does not work
-    raise Exception(str(s))  
     new_user = User(fullname=fullname, username=username, telegram_id=telegram_id, chat_id=chat_id)
 
     
@@ -103,20 +101,18 @@ logging.basicConfig(level=logging.DEBUG,
 logger = logging.getLogger(__name__)
 #########################################################################################
 ############# Functions ################
-def doStart(bot, group_id=0)
-    db_group = session.query(Group).filter(Group.id=group_id)
-    users = group.all_users
-    
+def doStart(group_id=0):
+    #TODO finish this function
+    users = getAllUsers()
     for user in users:
         bot.sendMessage(chat_id=user.chat_id, text="lotfan shoroo konid")
         # TODO send the document and the row
-        #define a function to get user number
-    group.has_started = True
-    group.start_date = datetime.datetime.now()
-    session.commit()  
+
+    ##### 1- query the group - session.query(Group).filter(Group.id=group_id)
+        ##2-  users = group.all_users
+        
 def groupFullNotif(Group):
     #TODO
-    #notify author if a group is full or automatically dostart
     pass
 
 ########################################################################################
@@ -191,16 +187,14 @@ def schedule(bot, update):
             bot.sendChatAction(chat_id=update.message.chat_id, action=ChatAction.UPLOAD_DOCUMENT) 
             bot.sendDocument(chat_id=update.message.chat_id, document=open('temp.txt','rb'), caption=user.first_name+'az radife {} shoru konid'.format(in_group_index))
             delta_t = datetime.datetime.now() - db_user.group.start_date
-            currentNum = in_group_index + delta_t.days 
-            currentRowNum = currentNum%355 #calculate currentNum mode
-            bot.sendMessage(chat_id=update.message.chat_id, text=telegram_user.first_name+" امروز باید ردیف {} را بخوانید.".format(currentRowNum))
+            currentNum = in_group_index + delta_t.days
+            bot.sendMessage(chat_id=update.message.chat_id, text=telegram_user.first_name+" امروز باید ردیف {} را بخوانید.".format(in_group_index))
 
 def emruz(bot, update):
     pass
 
 def unknown(bot, update):
     bot.sendMessage(chat_id=update.message.chat_id, text="Wrong message.")
-    
     
 
 ############# MESSAGE HANDLERS ###############
