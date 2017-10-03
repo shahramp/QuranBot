@@ -56,15 +56,14 @@ def getAllUsers():
 def addUser(fullname, username, telegram_id, chat_id):
     max_user = 355
     users = getAllUsers()
-    s=[]
+
     for user in users:
-        s.append(user.telegram_id)
         if not user.group.is_full:
             print("getAllUser")
             empty_group = None
-        if user.telegram_id == telegram_id:
-            raise Exception('You are already signed in')    #Does not work
-    raise Exception(str(s))  
+        if user.telegram_id == str(telegram_id):
+            raise Exception(username+ " "+ "شما قبلا ثبت نام کرده اید. برای اطلاعات بیشتر لطفا دستور schedule را اجرا کنید.")
+            #raise Exception('{} you are already signed in. Please run "schedule" command'.format(username))
     new_user = User(fullname=fullname, username=username, telegram_id=telegram_id, chat_id=chat_id)
 
     
@@ -103,14 +102,13 @@ logging.basicConfig(level=logging.DEBUG,
 logger = logging.getLogger(__name__)
 #########################################################################################
 ############# Functions ################
-def doStart(bot, group_id=0)
-    db_group = session.query(Group).filter(Group.id=group_id)
+def doStart(bot, group_id=0):
+    db_group = session.query(Group).filter(Group.id==group_id)
     users = group.all_users
     
     for user in users:
         bot.sendMessage(chat_id=user.chat_id, text="lotfan shoroo konid")
         # TODO send the document and the row
-        #define a function to get user number
     group.has_started = True
     group.start_date = datetime.datetime.now()
     session.commit()  
@@ -118,28 +116,30 @@ def groupFullNotif(Group):
     #TODO
     #notify author if a group is full or automatically dostart
     pass
+    
+    
+def getUserIndex(bot, user):
+    db_user = session.query(User).filter(User.telegram_id == user.id)
+    if db_user.all() ==[]:
+        userIndex = []
+    else:
+        userIndex = db_user.one().in_group_index
+    return userIndex
+
 
 ########################################################################################
 ############# COMMAND HANDLERS ##############
 def signup(bot, update):
     bot.sendChatAction(chat_id=update.message.chat_id, action=ChatAction.TYPING)
     user = update.message.from_user
-    db_user = session.query(User).filter(User.telegram_id == user.id)
-    if db_user.all()==[]:
-        try:
-            addUser(fullname=user.first_name+' '+user.last_name, username=user.username, telegram_id=user.id, chat_id=update.message.chat_id)
-            bot.sendMessage(chat_id=update.message.chat_id, text="سلام با تشکر از ثبت نام.")
-            db_user = session.query(User).filter(User.telegram_id == user.id)
-            in_group_index = db_user.one().in_group_index
-            bot.sendChatAction(chat_id=update.message.chat_id, action=ChatAction.UPLOAD_DOCUMENT) 
-            bot.sendDocument(chat_id=update.message.chat_id, document=open('Booklet.pdf','rb'), caption=user.first_name+' lotfan az radife {} shoru konid'.format(in_group_index))
-            print("User added")
-        except Exception as e:
-            bot.sendMessage(chat_id=update.message.chat_id, text=str(e))
-            print ("User adding failed:", str(e) )
-    else:
-        bot.sendMessage(chat_id=update.message.chat_id, text="شما قبلا ثبت نام کرده اید. برای اطلاعات بیشتر از دستور schedule/ استفاده کنید. ")
-
+    try:
+        addUser(fullname=user.first_name+' '+user.last_name, username=user.username, telegram_id=user.id, chat_id=update.message.chat_id)
+        bot.sendMessage(chat_id=update.message.chat_id, text="سلام با تشکر از ثبت نام.")
+        booklet(bot,update)
+        print("User added")
+    except Exception as e:
+        bot.sendMessage(chat_id=update.message.chat_id, text=str(e))
+    
 def signout(bot, update):
     #TODO
     bot.sendChatAction(chat_id=update.message.chat_id, action=ChatAction.TYPING)
@@ -178,19 +178,15 @@ def schedule(bot, update):
     bot.sendChatAction(chat_id=update.message.chat_id, action=ChatAction.TYPING)
     telegram_user = update.message.from_user
     db_user = session.query(User).join(User.group).options(contains_eager(User.group)).filter(User.telegram_id == telegram_user.id)
-    if db_user.all()==[]:
+    if getUserIndex(bot,telegram_user) ==[]:
         bot.sendMessage(chat_id=update.message.chat_id, text="شما در برنامه قرآن خوانی ثبت نام نکرده اید! اگر تمایل دارید ثبت نام کنید از دستور signup/ استفاده کنید.")
     else:
-        in_group_index = db_user.one().in_group_index 
         if db_user.one().group.has_started != True:
             bot.sendMessage(chat_id=update.message.chat_id, text="گروه شما هنوز شروع نشده است")
-            bot.sendMessage(chat_id=update.message.chat_id, text=telegram_user.first_name+" در روز شروع گروه، شما باید از ردیف {} شروع کنید.".format(in_group_index))
-        else:    
-            in_group_index = db_user.in_group_index   
-            #bot.sendMessage(chat_id=update.message.chat_id, text="Lotfan kami sabr konid.")
-            bot.sendChatAction(chat_id=update.message.chat_id, action=ChatAction.UPLOAD_DOCUMENT) 
-            bot.sendDocument(chat_id=update.message.chat_id, document=open('temp.txt','rb'), caption=user.first_name+'az radife {} shoru konid'.format(in_group_index))
-            delta_t = datetime.datetime.now() - db_user.group.start_date
+            bot.sendMessage(chat_id=update.message.chat_id, text=telegram_user.first_name+" در روز شروع گروه، شما باید از ردیف {} شروع کنید.".format(getUserIndex(bot, telegram_user)))
+        else:      
+            bot.sendMessage(chat_id=update.message.chat_id, text="گروه شما در تاریخ {} شروع شده است.".format(db_user.one().group.start_date))
+            delta_t = datetime.datetime.now() - db_user.one().group.start_date
             currentNum = in_group_index + delta_t.days 
             currentRowNum = currentNum%355 #calculate currentNum mode
             bot.sendMessage(chat_id=update.message.chat_id, text=telegram_user.first_name+" امروز باید ردیف {} را بخوانید.".format(currentRowNum))
@@ -200,6 +196,15 @@ def emruz(bot, update):
 
 def unknown(bot, update):
     bot.sendMessage(chat_id=update.message.chat_id, text="Wrong message.")
+    
+    
+def booklet(bot, update):
+    user = update.message.from_user
+    if getUserIndex(bot, user) ==[]:
+        bot.sendMessage(chat_id=update.message.chat_id, text="شما در برنامه قرآن خوانی ثبت نام نکرده اید! اگر تمایل دارید ثبت نام کنید از دستور signup/ استفاده کنید.")
+    else:
+        bot.sendChatAction(chat_id=update.message.chat_id, action=ChatAction.UPLOAD_DOCUMENT) 
+        bot.sendDocument(chat_id=update.message.chat_id, document=open('Booklet.pdf','rb'), caption=user.first_name+' lotfan az radife {} shoru konid'.format(getUserIndex(bot,user)))
     
     
 
@@ -228,6 +233,7 @@ def main():
     dispatcher.add_handler(CommandHandler('start', start))
     dispatcher.add_handler(CommandHandler('getall', getall))
     dispatcher.add_handler(CommandHandler('schedule', schedule))
+    dispatcher.add_handler(CommandHandler('booklet', booklet))
     dispatcher.add_handler(MessageHandler(Filters.command, unknown))
     dispatcher.add_handler(MessageHandler(Filters.text, echo))
     dispatcher.add_error_handler(error)
