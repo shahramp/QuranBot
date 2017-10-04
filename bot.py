@@ -72,7 +72,7 @@ def addUser(fullname, username, telegram_id, chat_id):
     if db_group == []:
         group = None
     else:
-        group = db_group[-1]
+        group = db_group[-1]  
     # if it's full/empty(no group) create a new group
     if group is None or group.is_full:
         print("Group None")
@@ -102,13 +102,17 @@ logging.basicConfig(level=logging.DEBUG,
 logger = logging.getLogger(__name__)
 #########################################################################################
 ############# Functions ################
-def doStart(bot, group_id=0):
+def doStart(bot, group_id=0):  
     db_group = session.query(Group).filter(Group.id==group_id)
+    group= db_group.one()
     users = group.all_users
+    # raise exception if group is already started
+    
     
     for user in users:
-        bot.sendMessage(chat_id=user.chat_id, text="lotfan shoroo konid")
-        # TODO send the document and the row
+        bot.sendMessage(chat_id=user.chat_id, text="گروه شما از امروز شروع شد.")
+        bot.sendChatAction(chat_id=user.chat_id, action=ChatAction.UPLOAD_DOCUMENT) 
+        bot.sendDocument(chat_id=user.chat_id, document=open('Booklet.pdf','rb'), caption=user.fullname+' lotfan az radife {} shoru konid'.format(user.in_group_index))
     group.has_started = True
     group.start_date = datetime.datetime.now()
     session.commit()  
@@ -145,10 +149,10 @@ def signout(bot, update):
     bot.sendChatAction(chat_id=update.message.chat_id, action=ChatAction.TYPING)
     bot.sendMessage(chat_id=update.message.chat_id, text="Salaam, Mamnoon az sabte nam. Khodahafez")
 
-def getall(bot, update, password_entered):
+def getall(bot, update, args):
     bot.sendChatAction(chat_id=update.message.chat_id, action=ChatAction.TYPING)
     global hashed_passowrd
-    password_entered = update.message.text
+    password_entered = args[0]
     if auth.verify(password_entered, hashed_password):
         users = getAllUsers()
         string = ""
@@ -158,16 +162,19 @@ def getall(bot, update, password_entered):
         print (string)
         print ('#'*50)
         bot.sendMessage(chat_id=update.message.chat_id, text=string)
+    else:
+        bot.sendMessage(chat_id=update.message.chat_id, text="Wrong password!")
 
-def start(bot, update, password_entered):
+def start(bot, update, args):
     try:
         user_id = update.message.from_user.id
-        password_entered = update.message.text
+        password_entered = args[0]
+        group_id = args[1]  # We should verify if the group_id is valid or not
         # password_entered, group_id = update.message.text.split()
         global hashed_password
         if auth.verify(password_entered, hashed_password):
-            group_id = 0
-            doStart(group_id)
+            #group_id = 0
+            doStart(bot, group_id)
         else:
             bot.sendMessage(chat_id=update.message.chat_id, text="Wrong password!")
 
@@ -187,7 +194,7 @@ def schedule(bot, update):
         else:      
             bot.sendMessage(chat_id=update.message.chat_id, text="گروه شما در تاریخ {} شروع شده است.".format(db_user.one().group.start_date))
             delta_t = datetime.datetime.now() - db_user.one().group.start_date
-            currentNum = in_group_index + delta_t.days 
+            currentNum = getUserIndex(bot, telegram_user) + delta_t.days 
             currentRowNum = currentNum%355 #calculate currentNum mode
             bot.sendMessage(chat_id=update.message.chat_id, text=telegram_user.first_name+" امروز باید ردیف {} را بخوانید.".format(currentRowNum))
 
@@ -230,8 +237,8 @@ def main():
     dispatcher = updater.dispatcher
     dispatcher.add_handler(CommandHandler('signup', signup))
     dispatcher.add_handler(CommandHandler('signout', signout))
-    dispatcher.add_handler(CommandHandler('start', start))
-    dispatcher.add_handler(CommandHandler('getall', getall))
+    dispatcher.add_handler(CommandHandler('start', start, pass_args=True))
+    dispatcher.add_handler(CommandHandler('getall', getall, pass_args=True))
     dispatcher.add_handler(CommandHandler('schedule', schedule))
     dispatcher.add_handler(CommandHandler('booklet', booklet))
     dispatcher.add_handler(MessageHandler(Filters.command, unknown))
